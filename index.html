@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>機場電車時刻表 (長輩友善版)</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang TC", "微軟正黑體", sans-serif; background: #eef2f5; margin: 0; padding: 0; }
+  .container { max-width: 600px; margin: 0 auto; background: #fff; min-height: 100vh; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+  .header { background: #2c3e50; color: #fff; padding: 20px; text-align: center; font-size: 28px; font-weight: bold; letter-spacing: 2px;}
+  .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 15px; background: #f8f9fa; border-bottom: 2px solid #ddd;}
+  .tab-btn { padding: 15px 10px; font-size: 20px; border: 2px solid #ccc; background: #fff; border-radius: 12px; cursor: pointer; font-weight: bold; color: #555; transition: 0.3s; line-height: 1.4;}
+  .tab-btn.active { background: #007bff; color: white; border-color: #007bff; box-shadow: 0 4px 6px rgba(0,123,255,0.3);}
+  .schedule-list { list-style: none; padding: 0; margin: 0; display: none; }
+  .schedule-list.active { display: block; }
+  
+  .hour-divider { background: #dce4ec; color: #2c3e50; font-size: 24px; font-weight: bold; padding: 12px 20px; text-align: left; border-left: 8px solid #2c3e50; margin-top: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);}
+  .schedule-list .hour-divider:first-child { margin-top: 0; }
+  
+  .list-item { display: flex; align-items: center; justify-content: space-between; padding: 25px 20px; border-bottom: 2px solid #f0f0f0; }
+  .list-item:nth-child(even) { background-color: #fafbfc; }
+  .type { padding: 10px 15px; border-radius: 8px; font-weight: bold; font-size: 22px; text-align: center; width: 130px; flex-shrink: 0; letter-spacing: 1px;}
+  .type.reserved { background: #1a73e8; color: #fff; }
+  .type.non-reserved { background: #f29900; color: #fff; }
+  .time-block { display: flex; align-items: center; flex-grow: 1; justify-content: flex-end; font-weight: bold; font-size: 32px; color: #333;}
+  .arrow { margin: 0 15px; color: #aaa; font-size: 24px;}
+  .time { width: 95px; text-align: center; }
+  
+  #loading { text-align: center; padding: 50px; font-size: 24px; color: #666; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">機場電車時刻表</div>
+  <div class="tabs">
+    <button class="tab-btn active" onclick="showTab('kix-namba-wd', this)">關西 ➔ 難波<br>(平日)</button>
+    <button class="tab-btn" onclick="showTab('kix-namba-we', this)">關西 ➔ 難波<br>(假日)</button>
+    <button class="tab-btn" onclick="showTab('namba-kix-wd', this)">難波 ➔ 關西<br>(平日)</button>
+    <button class="tab-btn" onclick="showTab('namba-kix-we', this)">難波 ➔ 關西<br>(假日)</button>
+  </div>
+
+  <div id="loading">載入時刻表中...</div>
+
+  <ul id="kix-namba-wd" class="schedule-list"></ul>
+  <ul id="kix-namba-we" class="schedule-list"></ul>
+  <ul id="namba-kix-wd" class="schedule-list"></ul>
+  <ul id="namba-kix-we" class="schedule-list"></ul>
+</div>
+
+<script>
+  function renderList(id, listData) {
+    const sortedData = [...listData].sort((a, b) => {
+        const timeA = a[1].split(':').map(Number);
+        const timeB = b[1].split(':').map(Number);
+        return (timeA[0] * 60 + timeA[1]) - (timeB[0] * 60 + timeB[1]);
+    });
+
+    const ul = document.getElementById(id);
+    let html = '';
+    let currentHour = '';
+
+    sortedData.forEach(item => {
+      const timeParts = item[1].split(':');
+      const hour = timeParts[0];
+
+      if (hour !== currentHour) {
+        currentHour = hour;
+        html += `<li class="hour-divider">${currentHour} 點</li>`;
+      }
+
+      html += `
+        <li class="list-item">
+          <div class="type ${item[0] === '對號座' ? 'reserved' : 'non-reserved'}">${item[0]}</div>
+          <div class="time-block">
+            <span class="time">${item[1]}</span>
+            <span class="arrow">➔</span>
+            <span class="time">${item[2]}</span>
+          </div>
+        </li>
+      `;
+    });
+    
+    ul.innerHTML = html;
+  }
+
+  function showTab(tabId, btnElement) {
+    document.querySelectorAll('.schedule-list').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+    if (btnElement) {
+        btnElement.classList.add('active');
+    } else {
+        // Default select first tab if no button provided
+        document.querySelector('.tab-btn').classList.add('active');
+    }
+  }
+
+  // 透過 Fetch API 讀取獨立的 JSON 檔案
+  fetch('schedule_data.json')
+    .then(response => response.json())
+    .then(data => {
+      document.getElementById('loading').style.display = 'none'; // 隱藏載入提示
+      
+      for (const [id, listData] of Object.entries(data)) {
+        renderList(id, listData);
+      }
+      
+      // 預設顯示第一個分頁
+      showTab('kix-namba-wd', document.querySelector('.tab-btn'));
+    })
+    .catch(error => {
+      console.error('Error loading schedule:', error);
+      document.getElementById('loading').innerText = '時刻表載入失敗，請稍後再試。';
+    });
+</script>
+</body>
+</html>
